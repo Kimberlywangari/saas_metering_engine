@@ -2,8 +2,7 @@
 
 A Django-based backend for metering per-tenant API usage against
 subscription-tier quotas, with atomic usage tracking, account status
-enforcement, and an admin dashboard summarizing Monthly Recurring Revenue
-(MRR).
+enforcement, and both a JSON API and a browser-facing dashboard.
 
 ## Features
 
@@ -17,9 +16,13 @@ enforcement, and an admin dashboard summarizing Monthly Recurring Revenue
   at the database level using `F()` expressions, so concurrent requests
   for the same tenant cannot undercount usage.
 - **Plain Django views**: no Django REST Framework — `JsonResponse` from
-  standard `django.views.View` subclasses.
+  standard `django.views.View` subclasses for the API, plus function-based
+  views using `render`/`redirect` for the browser-facing dashboard.
 - **Custom admin**: usage-ratio column, colored status badges, and an MRR
   summary banner computed via `Decimal`-safe aggregation.
+- **Public tenant dashboard**: a browser-viewable page listing every
+  tenant's company name, tier, usage vs. quota, and status, with a button
+  per row to record a test API call live.
 - **Environment-driven settings**: secrets and environment-specific
   behavior are read from a `.env` file / real environment variables, never
   hardcoded, and `config/settings/` is split into `base.py`, `dev.py`, and
@@ -83,8 +86,9 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-- App root: `http://127.0.0.1:8000/`
 - Django admin: `http://127.0.0.1:8000/admin/`
+- Tenant dashboard: `http://127.0.0.1:8000/api/dashboard/`
+- Metered API endpoint: `http://127.0.0.1:8000/api/meter/`
 
 By default `manage.py` uses `config.settings.dev`. To run against
 production settings (which validate that `SECRET_KEY`, `ALLOWED_HOSTS`,
@@ -109,12 +113,10 @@ python manage.py test apps.subscriptions
 # Verbose output
 python manage.py test apps.subscriptions -v 2
 
-# Using pytest instead
-pytest
-
-# With coverage
-coverage run -m pytest
-coverage report
+# Run a single test file, class, or method
+python manage.py test apps.subscriptions.tests.test_views
+python manage.py test apps.subscriptions.tests.test_views.MeteredEndpointViewTests
+python manage.py test apps.subscriptions.tests.test_views.MeteredEndpointViewTests.test_returns_429_when_quota_is_hit
 ```
 
 ---
@@ -203,7 +205,26 @@ curl http://127.0.0.1:8000/api/tenants/usage/ \
 
 ---
 
-## 7. Project Structure
+## 7. Browser-Facing Dashboard
+
+Unlike the JSON endpoints above, these two routes render HTML for a human
+visiting in a browser — no headers or `curl` required.
+
+### `GET /api/dashboard/`
+
+Lists every tenant with their company name, tier, usage/quota, status
+(color-coded), and a "+1 API Call" button per row.
+
+### `POST /api/tenants/<tenant_id>/record/`
+
+Triggered by the dashboard's per-row button. Records one API call for
+that tenant (via the same `record_api_call` service function used by the
+`/api/meter/` endpoint), then redirects back to `/api/dashboard/` so the
+updated usage count is visible immediately.
+
+---
+
+## 8. Project Structure
 
 ```
 saas_metering_engine/
@@ -223,20 +244,24 @@ saas_metering_engine/
 └── apps/
     └── subscriptions/
         ├── migrations/
+        ├── templates/
+        │   └── subscriptions/
+        │       └── dashboard.html   # browser-facing tenant dashboard
         ├── tests/
-        │   ├── test_models.py
+        │   ├── test_model.py
         │   ├── test_services.py
         │   └── test_views.py
         ├── admin.py      # custom list displays, MRR summary
         ├── models.py     # SubscriptionTier, TenantAccount
         ├── services.py   # record_api_call, reset_daily_usage, update_tenant_status
         ├── urls.py
-        └── views.py      # MeteredEndpointView, TenantUsageStatusView
+        └── views.py      # MeteredEndpointView, TenantUsageStatusView,
+                           # dashboard_view, record_call_view
 ```
 
 ---
 
-## 8. Design Notes
+## 9. Design Notes
 
 - **Why `F()` expressions for usage increments**: reading
   `current_api_usage`, adding 1 in Python, and saving it back is vulnerable
@@ -254,7 +279,16 @@ saas_metering_engine/
   surface floating-point noise (e.g. `49.9900000000000`). The admin
   explicitly re-quantizes the aggregated total to 2 decimal places so the
   figure displays as a clean currency value on any backend.
-- **Why the metered endpoint is CSRF-exempt**: `X-Tenant-ID` header-based
-  metering is a machine-to-machine API contract, not a browser session
-  submitting an HTML form, so Django's cookie-based CSRF protection does
-  not apply to it.
+- **Why the metered endpoint is CSRF-exempt, but the dashboard is not**:
+  `X-Tenant-ID` header-based metering (`/api/meter/`) is a
+  machine-to-machine API contract, not a browser session submitting an
+  HTML form, so Django's cookie-based CSRF protection does not apply.
+  `/api/dashboard/`'s "+1 API Call" button, by contrast, is a real HTML
+  `<form>` submitted from a browser session, so it correctly includes
+  `{% csrf_token %}` and is *not* exempted.
+- **Known gap — no billing lifecycle automation**: `TenantAccount.status`
+  only changes when explicitly set via `update_tenant_status()`, the
+  admin, or the shell. There is no scheduled job or payment-provider
+  webhook wired up to automatically transition an account to `PAST_DUE`
+  or `CANCELED` — that integration is intentionally out of scope for this
+  engine, which focuses on metering and enforcement, not billing.

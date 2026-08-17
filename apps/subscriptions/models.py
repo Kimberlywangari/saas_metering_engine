@@ -5,13 +5,7 @@ from django.db.models import Q
 
 
 class SubscriptionTier(models.Model):
-    """
-    A billing plan tenants can subscribe to (e.g. BASIC, PRO, ENTERPRISE).
-
-    This is the "one" side of a one-to-many relationship: a single tier can
-    be shared by many TenantAccount rows.
-    """
-
+    
     name = models.CharField(max_length=50, unique=True)
     monthly_price = models.DecimalField(max_digits=10, decimal_places=2)
     api_call_limit = models.PositiveIntegerField(

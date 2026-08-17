@@ -1,10 +1,12 @@
 from django.urls import path
 
-from .views import MeteredEndpointView, TenantUsageStatusView
+from .views import MeteredEndpointView, TenantUsageStatusView, dashboardView
+
 
 app_name = "subscriptions"
 
 urlpatterns = [
+    path("dashboard/", dashboardView, name="tenant-dashboard"),
     path("meter/", MeteredEndpointView.as_view(), name="metered-endpoint"),
     path(
         "tenants/<int:tenant_id>/usage/",

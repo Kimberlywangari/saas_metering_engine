@@ -1,6 +1,7 @@
 
 # Create your views here.
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -9,6 +10,10 @@ from .models import TenantAccount
 from .services import record_api_call
 
 TENANT_ID_HEADER = "HTTP_X_TENANT_ID"
+
+def dashboardView(request):
+    tenants = TenantAccount.objects.select_related('tier').all()
+    return render(request, 'subscriptions/dashboard.html', {'tenants': tenants})
 
 
 @method_decorator(csrf_exempt, name="dispatch")

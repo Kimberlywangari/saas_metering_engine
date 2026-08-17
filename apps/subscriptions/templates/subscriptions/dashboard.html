@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tenant Dashboard</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        .active { color: #1a7f37; font-weight: bold; }
+        .past_due { color: #b35900; font-weight: bold; }
+        .canceled { color: #b91c1c; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Tenant Dashboard</h1>
+
+    <table>
+        <tr>
+            <th>Company</th>
+            <th>Tier</th>
+            <th>Usage / Quota</th>
+            <th>Status</th>
+        </tr>
+        {% for tenant in tenants %}
+        <tr>
+            <td>{{ tenant.company_name }}</td>
+            <td>{{ tenant.tier.name }}</td>
+            <td>{{ tenant.current_api_usage }} / {{ tenant.tier.api_call_limit }}</td>
+            <td class="{{ tenant.status|lower }}">{{ tenant.get_status_display }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

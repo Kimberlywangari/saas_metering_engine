@@ -5,11 +5,18 @@ from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import redirect
+
 
 from .models import TenantAccount
 from .services import record_api_call
 
 TENANT_ID_HEADER = "HTTP_X_TENANT_ID"
+
+
+def record_call_view(request, tenant_id):
+    record_api_call(tenant_id)
+    return redirect("subscriptions:tenant-dashboard")
 
 def dashboardView(request):
     tenants = TenantAccount.objects.select_related('tier').all()

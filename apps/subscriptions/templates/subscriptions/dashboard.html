@@ -10,6 +10,7 @@
         .active { color: #1a7f37; font-weight: bold; }
         .past_due { color: #b35900; font-weight: bold; }
         .canceled { color: #b91c1c; font-weight: bold; }
+        button { padding: 4px 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -21,6 +22,7 @@
             <th>Tier</th>
             <th>Usage / Quota</th>
             <th>Status</th>
+            <th>Action</th>
         </tr>
         {% for tenant in tenants %}
         <tr>
@@ -28,6 +30,12 @@
             <td>{{ tenant.tier.name }}</td>
             <td>{{ tenant.current_api_usage }} / {{ tenant.tier.api_call_limit }}</td>
             <td class="{{ tenant.status|lower }}">{{ tenant.get_status_display }}</td>
+            <td>
+                <form method="post" action="{% url 'subscriptions:record-call' tenant.id %}">
+                    {% csrf_token %}
+                    <button type="submit">+1 API Call</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </table>
